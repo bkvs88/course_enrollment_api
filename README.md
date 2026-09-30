@@ -19,15 +19,8 @@ uvicorn student_course_mgmt:app --reload
 
 Interactive API docs are then at `http://127.0.0.1:8000/docs`.
 
-The tables must exist before the app is useful. `students` is not in
-`schema.sql` and is not created by the app either, so create it first. Only the
-`id` column is read; the example below is the minimum:
-
-```sql
-CREATE TABLE students (id serial PRIMARY KEY);
-```
-
-Then apply `schema.sql`, which is idempotent, so applying it more than once is
+The tables must exist before the app is useful. `schema.sql` creates all three,
+in dependency order, and is idempotent, so applying it more than once is
 harmless:
 
 ```bash
@@ -37,8 +30,13 @@ psql "$DATABASE_URL" -f schema.sql
 ## The data model
 
 ```
-students  (not created here, read-only; only `id` is used)
-    must exist before schema.sql is applied
+students
+    id       serial primary key
+    name     varchar(100) not null
+    age      integer not null
+    city     varchar(100) not null
+    email    varchar(255) unique
+    course   varchar(100)     free text, not kept in sync with enrollments
 
 courses
     id          serial primary key
@@ -67,11 +65,11 @@ check on its own would leave that race open.
 deleting a course releases every seat in it. Neither leaves rows pointing at
 something that no longer exists.
 
-**The `students` table is not created here, and nothing in this repository
-creates it.** `schema.sql` only references it, so the foreign key fails without
-it. Create it yourself before applying the schema; this app reads nothing but
-`id`. Ids are never invented, so a student that does not exist is a `404`, never
-an implicitly created student.
+**`students` exists for the foreign key, but the app never writes to it.** The
+schema declares the wider columns so the table stands on its own; these routes
+read nothing but `id`, and they never insert a student. Ids are not invented, so
+a student that does not exist is a `404`, never an implicitly created student.
+Rows get in through direct SQL, since the app exposes no student routes.
 
 ## Endpoints
 
@@ -184,10 +182,9 @@ any query runs.
 
 ## Notes and limitations
 
-- **This app creates nothing.** No `CREATE TABLE`, no `create_all()`, no Alembic.
-  That is why `schema.sql` exists and why applying it is a manual step. A fresh
-  database will fail every route until `students` and `schema.sql` are both in
-  place.
+- **The app creates nothing.** No `CREATE TABLE`, no `create_all()`, no Alembic.
+  `schema.sql` does that, by hand. A fresh database fails every route until it
+  is applied.
 - **The startup query is a smoke test.** `get_courses()` is called once at import
   purely to surface a missing table early. The result is discarded and a failure
   is printed rather than raised, so a broken database cannot stop the server from
@@ -199,6 +196,5 @@ any query runs.
   enrollment there is no pre-read, because the database can arbitrate a name
   clash by itself and a read-then-write would merely add a race.
 - **Course names are case-sensitive**, so `Python` and `python` are two courses.
-- **Nothing here keeps a `students` table in sync with `enrollments`.** Enrollment
-  is expressed solely through the `enrollments` table; any other column on
-  `students` is outside this app's knowledge.
+- **`students.course` is not enrollment.** It is a free-text column and nothing
+  keeps it in step with the `enrollments` table.

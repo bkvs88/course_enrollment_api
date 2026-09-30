@@ -19,11 +19,9 @@ Storage is two tables, both defined in ``schema.sql``:
     enrollments (id, student_id, course_id, enrolled_at)
                 with UNIQUE (student_id, course_id).
 
-The ``students`` table is neither created nor owned here: it is read only, and
-nothing in this repository creates it, so it has to exist before the enrollment
-routes are usable. The ids they accept must already be present in it; a student
-that does not is reported as 404 rather than created implicitly. Only the ``id``
-column is used.
+``schema.sql`` creates ``students`` alongside these two, but the app itself
+never writes to it: the enrollment routes read ``id`` only, and an id that is
+not already present is reported as 404 rather than created implicitly.
 
 Queries are written as raw parameterised SQL via ``text()``.
 
@@ -34,8 +32,7 @@ two concurrent requests can both pass the check, but only one INSERT can commit.
 The losing request's IntegrityError is caught and reported as the same 409.
 
 **This module creates and migrates nothing.** It issues no ``CREATE TABLE`` and
-calls no Alembic. ``schema.sql`` must already have been applied, and the
-``students`` table it references must already exist. Without them every route
+calls no Alembic. ``schema.sql`` must already have been applied, or every route
 fails with 500.
 
 Run with: uvicorn student_course_mgmt:app --reload
@@ -244,9 +241,9 @@ def create_course(course: CourseCreate):
 class EnrollCreate(BaseModel):
     """Payload for enrolling a student in a course.
 
-    Attributes:
-        student_id: Primary key of an existing student in the ``students``
-            table, at least 1. That table is not created by this app.
+        Attributes:
+        student_id: Primary key of an existing row in the ``students`` table,
+            at least 1. Read-only as far as this app is concerned.
         course_id: Primary key of an existing course, at least 1.
     """
 
