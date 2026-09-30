@@ -15,6 +15,19 @@
 -- A catalogue of courses. ``name`` is unique so a course cannot be defined
 -- twice under slightly different spellings, and the enrollment routes report
 -- that clash as 409.
+
+CREATE TABLE "students" (
+	"id" serial PRIMARY KEY,
+	"name" varchar(100) NOT NULL,
+	"age" integer NOT NULL,
+	"city" varchar(100) NOT NULL,
+	"email" varchar(255),
+	"course" varchar(100)
+);
+CREATE UNIQUE INDEX "students_email_key" ON "students" ("email");
+CREATE UNIQUE INDEX "students_pkey" ON "students" ("id");
+
+
 CREATE TABLE "courses" (
 	"id" serial PRIMARY KEY,
 	"name" varchar(100) NOT NULL CONSTRAINT "courses_name_key" UNIQUE,
@@ -46,13 +59,3 @@ ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_student_id_fkey" FOREIGN K
 
 
 
-CREATE TABLE "students" (
-	"id" serial PRIMARY KEY,
-	"name" varchar(100) NOT NULL,
-	"age" integer NOT NULL,
-	"city" varchar(100) NOT NULL,
-	"email" varchar(255),
-	"course" varchar(100)
-);
-CREATE UNIQUE INDEX "students_email_key" ON "students" ("email");
-CREATE UNIQUE INDEX "students_pkey" ON "students" ("id");
