@@ -41,7 +41,6 @@ CREATE TABLE "enrollments" (
 );
 CREATE UNIQUE INDEX "enrollments_pkey" ON "enrollments" ("id");
 CREATE INDEX "ix_enrollments_course_id" ON "enrollments" ("course_id");
-CREATE UNIQUE INDEX "uq_enrollments_student_course" ON "enrollments" ("student_id","course_id");
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "courses"("id") ON DELETE CASCADE;
 ALTER TABLE "enrollments" ADD CONSTRAINT "enrollments_student_id_fkey" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE;
 
