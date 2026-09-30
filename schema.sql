@@ -33,7 +33,6 @@ CREATE TABLE "courses" (
 	"name" varchar(100) NOT NULL CONSTRAINT "courses_name_key" UNIQUE,
 	"description" varchar(500)
 );
-CREATE UNIQUE INDEX "courses_name_key" ON "courses" ("name");
 CREATE UNIQUE INDEX "courses_pkey" ON "courses" ("id");
 
 -- One row per student/course pairing.
