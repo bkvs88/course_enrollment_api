@@ -2,8 +2,8 @@
 
 This module builds its own SQLAlchemy engine and session factory from the
 ``DATABASE_URL`` in the .env file, then registers the enrollment routes on a
-FastAPI ``app``. It is a separate application from ``student_mgmt``: run either
-independently, or both at once under different ports.
+FastAPI ``app``. It is a standalone application with no sibling module in this
+repository.
 
 Routes exposed by this module:
 
@@ -19,12 +19,13 @@ Storage is two tables, both defined in ``schema.sql``:
     enrollments (id, student_id, course_id, enrolled_at)
                 with UNIQUE (student_id, course_id).
 
-The ``students`` table is owned by ``student_mgmt.py`` and read only here, so
-the ids accepted by the enrollment routes must already exist there; a student
-that does not is reported as 404 rather than created implicitly.
+The ``students`` table is neither created nor owned here: it is read only, and
+nothing in this repository creates it, so it has to exist before the enrollment
+routes are usable. The ids they accept must already be present in it; a student
+that does not is reported as 404 rather than created implicitly. Only the ``id``
+column is used.
 
-Queries are written as raw parameterised SQL via ``text()``, matching the style
-of ``student_mgmt.py``.
+Queries are written as raw parameterised SQL via ``text()``.
 
 Double enrollment is prevented twice over. The handler first checks whether the
 pairing exists and returns 409 with a readable message, and the
@@ -33,9 +34,9 @@ two concurrent requests can both pass the check, but only one INSERT can commit.
 The losing request's IntegrityError is caught and reported as the same 409.
 
 **This module creates and migrates nothing.** It issues no ``CREATE TABLE`` and
-calls no Alembic. The schema must already exist, which is what ``schema.sql``
-is for; applying it once is the only setup step. Without it every route fails
-with 500 until the tables are created.
+calls no Alembic. ``schema.sql`` must already have been applied, and the
+``students`` table it references must already exist. Without them every route
+fails with 500.
 
 Run with: uvicorn student_course_mgmt:app --reload
 """
@@ -180,7 +181,7 @@ class CourseCreate(BaseModel):
 
         So "  Data  Science " is stored as "Data Science", which keeps
         differently spaced spellings of the same course in one value. Case is
-        left alone, matching how ``student_mgmt`` treats its course column.
+        left alone, so ``Python`` and ``python`` stay distinct courses.
         """
 
         return " ".join(v.split())
@@ -193,9 +194,9 @@ def create_course(course: CourseCreate):
     The ``id`` column is left to its sequence default, so rows are numbered by
     the database. The route is POST on /courses, so there is no id in the path.
 
-    Unlike the equivalent route in ``student_mgmt``, the created row is read
-    back with ``RETURNING`` and returned in full. An enrollment needs the course
-    id, and a client cannot learn it without a follow-up GET.
+    The created row is read back with ``RETURNING`` and returned in full. An
+    enrollment needs the course id, and a client cannot learn it without a
+    follow-up GET.
 
     Args:
         course: Validated name and optional description of the course to add.
@@ -245,7 +246,7 @@ class EnrollCreate(BaseModel):
 
     Attributes:
         student_id: Primary key of an existing student in the ``students``
-            table, at least 1.
+            table, at least 1. That table is not created by this app.
         course_id: Primary key of an existing course, at least 1.
     """
 

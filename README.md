@@ -19,8 +19,16 @@ uvicorn student_course_mgmt:app --reload
 
 Interactive API docs are then at `http://127.0.0.1:8000/docs`.
 
-The tables must exist before the app is useful. `schema.sql` is idempotent, so
-applying it more than once is harmless:
+The tables must exist before the app is useful. `students` is not in
+`schema.sql` and is not created by the app either, so create it first. Only the
+`id` column is read; the example below is the minimum:
+
+```sql
+CREATE TABLE students (id serial PRIMARY KEY);
+```
+
+Then apply `schema.sql`, which is idempotent, so applying it more than once is
+harmless:
 
 ```bash
 psql "$DATABASE_URL" -f schema.sql
@@ -29,8 +37,8 @@ psql "$DATABASE_URL" -f schema.sql
 ## The data model
 
 ```
-students  (owned by the student-management API, read-only here)
-    id, name, age, city, email, course
+students  (not created here, read-only; only `id` is used)
+    must exist before schema.sql is applied
 
 courses
     id          serial primary key
@@ -59,8 +67,11 @@ check on its own would leave that race open.
 deleting a course releases every seat in it. Neither leaves rows pointing at
 something that no longer exists.
 
-**The `students` table is not created here.** Its ids are read and referenced, so
-a student that does not exist is a `404`, never an implicitly created student.
+**The `students` table is not created here, and nothing in this repository
+creates it.** `schema.sql` only references it, so the foreign key fails without
+it. Create it yourself before applying the schema; this app reads nothing but
+`id`. Ids are never invented, so a student that does not exist is a `404`, never
+an implicitly created student.
 
 ## Endpoints
 
@@ -167,26 +178,27 @@ Payloads are Pydantic models, so malformed input is rejected with a `422` before
 any query runs.
 
 - `CourseCreate.name` — 2–100 characters, whitespace collapsed so `"  Data   Science "`
-  and `"Data Science"` are the same course. Case is left alone, matching how the
-  sibling student API treats its `course` column.
+  and `"Data Science"` are the same course. Case is left alone, so `Python` and
+  `python` remain two courses.
 - `EnrollCreate.student_id` / `course_id` — integers of at least 1.
 
 ## Notes and limitations
 
 - **This app creates nothing.** No `CREATE TABLE`, no `create_all()`, no Alembic.
   That is why `schema.sql` exists and why applying it is a manual step. A fresh
-  database will fail every route until it is applied.
+  database will fail every route until `students` and `schema.sql` are both in
+  place.
 - **The startup query is a smoke test.** `get_courses()` is called once at import
   purely to surface a missing table early. The result is discarded and a failure
   is printed rather than raised, so a broken database cannot stop the server from
   booting.
 - **Raw SQL, not the ORM.** Queries are parameterised via `text()` with bound
-  parameters, matching the sibling student-management API. Values are never
-  interpolated into SQL.
+  parameters. Values are never interpolated into SQL.
 - **`sessions` are per-request** and closed by the `with` block.
 - **The duplicate-name check on `POST /courses` is only the constraint.** Unlike
   enrollment there is no pre-read, because the database can arbitrate a name
   clash by itself and a read-then-write would merely add a race.
 - **Course names are case-sensitive**, so `Python` and `python` are two courses.
-- **`students.course`** is a free-text column in the student-management API and
-  is unrelated to the `enrollments` table. Nothing here keeps the two in sync.
+- **Nothing here keeps a `students` table in sync with `enrollments`.** Enrollment
+  is expressed solely through the `enrollments` table; any other column on
+  `students` is outside this app's knowledge.
